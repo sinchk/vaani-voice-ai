@@ -1,0 +1,4 @@
+[
+  {"order_id": "1042", "status": "Shipped", "customer": "Sinchana", "items": ["Wireless Headphones"], "eta": "2026-10-05"},
+  {"order_id": "1043", "status": "Processing", "customer": "Rahul", "items": ["Smartphone Case"], "eta": "2026-10-07"}
+]

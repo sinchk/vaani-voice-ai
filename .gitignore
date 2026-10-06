@@ -1,0 +1,25 @@
+# Environment variables and API keys
+.env
+*.env
+vaani/.env
+
+# Python Virtual Environment
+venv/
+env/
+ENV/
+*.venv
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*.class
+*.pytest_cache/
+
+# ChromaDB & Vector Store caches
+vaani/chroma_db/
+chroma_db/
+*.sqlite3
+
+# Audio output dumps
+*.wav
+*.mp3
