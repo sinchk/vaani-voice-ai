@@ -1,0 +1,35 @@
+services:
+  api:
+    build: .
+    env_file: .env
+    environment:
+      VAANI_STATE_DIR: /app/.state
+      PERSIST_DIRECTORY: /app/chroma_db
+      HF_HOME: /home/vaani/.cache/huggingface # Whisper weights are downloaded here on first voice request
+    ports:
+      - "8000:8000"
+    volumes:
+      - vaani_state:/app/.state
+      - vaani_chroma:/app/chroma_db
+      - vaani_models:/home/vaani/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  ui:
+    build: .
+    command: ["streamlit", "run", "frontend/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+    environment:
+      VAANI_API_URL: http://api:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  vaani_state:
+  vaani_chroma:
+  vaani_models:
