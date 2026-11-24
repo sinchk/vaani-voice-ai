@@ -47,7 +47,13 @@ class Case:
 
 CASES: list[Case] = [
     # --- RAG -----------------------------------------------------------------
-    Case("return policy", ["What is your return policy?"], "rag", source="return_policy.txt", facts=["30 days"]),
+    Case(
+        "return policy",
+        ["What is your return policy?"],
+        "rag",
+        source="return_policy.txt",
+        facts=["30 days", "thirty days", "30-day"],
+    ),
     Case(
         "return used item",
         ["Can I return a used item?"],
@@ -67,7 +73,7 @@ CASES: list[Case] = [
         ["Help me with the cancellation policy"],
         "rag",
         source="cancellation_policy.txt",
-        facts=["2 hours"],
+        facts=["2 hours", "two hours"],
     ),
     Case("kn return policy", ["ವಾಪಸಾತಿ ನೀತಿ ತಿಳಿಸಿ"], "rag", lang="kn", source="return_policy.txt"),
     Case("kn shipping", ["ಶಿಪ್ಪಿಂಗ್ ಎಷ್ಟು ದಿನ ತೆಗೆದುಕೊಳ್ಳುತ್ತದೆ?"], "rag", lang="kn", source="shipping_policy.txt"),

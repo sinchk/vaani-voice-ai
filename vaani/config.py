@@ -41,7 +41,7 @@ class Settings:
         )
     )
     embedding_model: str = field(default_factory=lambda: os.getenv("VAANI_EMBEDDING_MODEL", "gemini-embedding-001"))
-    llm_max_retries: int = field(default_factory=lambda: int(os.getenv("VAANI_LLM_MAX_RETRIES", "3")))
+    llm_max_retries: int = field(default_factory=lambda: int(os.getenv("VAANI_LLM_MAX_RETRIES", "2")))
     max_tool_rounds: int = field(default_factory=lambda: int(os.getenv("VAANI_MAX_TOOL_ROUNDS", "4")))
 
     # --- RAG --------------------------------------------------------------
