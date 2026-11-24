@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 
 from vaani.agent.agent import VaaniAgent
-from vaani.speech.asr import ASRProcessor
+from vaani.speech.asr import ASRProcessor, GeminiASR, build_asr
 from vaani.speech.tts import TTSProcessor
 from vaani.tools import ToolRegistry
 
@@ -21,8 +21,8 @@ def get_tools() -> ToolRegistry:
 
 
 @lru_cache(maxsize=1)
-def get_asr() -> ASRProcessor:
-    return ASRProcessor()
+def get_asr() -> ASRProcessor | GeminiASR:
+    return build_asr()
 
 
 @lru_cache(maxsize=1)

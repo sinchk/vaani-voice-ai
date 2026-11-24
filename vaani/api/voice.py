@@ -10,7 +10,7 @@ from vaani.agent.agent import VaaniAgent
 from vaani.api.deps import get_agent, get_asr, get_tts
 from vaani.api.schemas import ChatResponse, VoiceResponse
 from vaani.config import get_settings
-from vaani.speech.asr import ASRProcessor
+from vaani.speech.asr import ASRProcessor, GeminiASR
 from vaani.speech.tts import TTSProcessor
 from vaani.text_utils import detect_language
 
@@ -25,7 +25,7 @@ def voice(
     session_id: str = Form(..., min_length=1, max_length=128),
     file: UploadFile = File(...),
     agent: VaaniAgent = Depends(get_agent),
-    asr: ASRProcessor = Depends(get_asr),
+    asr: ASRProcessor | GeminiASR = Depends(get_asr),
     tts: TTSProcessor = Depends(get_tts),
 ) -> VoiceResponse:
     suffix = Path(file.filename or "").suffix.lower() or ".wav"

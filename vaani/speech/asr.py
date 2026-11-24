@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 
 from vaani.config import get_settings
+from vaani.text_utils import detect_language
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +44,49 @@ class ASRProcessor:
         segments, info = self._load().transcribe(audio_path, beam_size=5, vad_filter=True)
         text = " ".join(seg.text.strip() for seg in segments).strip()
         return Transcript(text=text, language=info.language, probability=float(info.language_probability))
+
+
+_MIME = {
+    ".wav": "audio/wav",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".ogg": "audio/ogg",
+    ".webm": "audio/webm",
+    ".flac": "audio/flac",
+}
+_ASR_PROMPT = (
+    "Transcribe this audio exactly as spoken, in the original language and script "
+    "(Kannada in Kannada script, English in English, mixed speech kept mixed). "
+    "Write digits as numerals. Output only the transcript, or nothing if there is no speech."
+)
+
+
+class GeminiASR:
+    """Transcription via Gemini's native audio understanding (much stronger on Kannada than small Whisper)."""
+
+    def __init__(self, models: list[str] | None = None) -> None:
+        s = get_settings()
+        self.models = models or [s.chat_model, *s.fallback_models]
+
+    def transcribe(self, audio_path: str) -> Transcript:
+        from google.genai import types
+
+        from vaani.agent.llm import LLMUnavailableError, generate_with_retry
+
+        path = Path(audio_path)
+        part = types.Part.from_bytes(data=path.read_bytes(), mime_type=_MIME.get(path.suffix.lower(), "audio/wav"))
+        config = types.GenerateContentConfig(temperature=0.0)
+        for model in self.models:
+            try:
+                response = generate_with_retry(model, [part, _ASR_PROMPT], config, retries=1)
+                break
+            except LLMUnavailableError:
+                logger.warning("ASR: %s unavailable; trying next model", model)
+        else:
+            raise LLMUnavailableError("All Gemini models are unavailable for transcription")
+        text = (response.text or "").strip()
+        return Transcript(text=text, language=detect_language(text), probability=1.0)
+
+
+def build_asr() -> ASRProcessor | GeminiASR:
+    return GeminiASR() if get_settings().asr_backend == "gemini" else ASRProcessor()
