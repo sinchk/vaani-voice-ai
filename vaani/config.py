@@ -32,8 +32,14 @@ class Settings:
     # --- LLM / embeddings -------------------------------------------------
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     chat_model: str = field(default_factory=lambda: os.getenv("VAANI_CHAT_MODEL", "gemini-3.8-flash"))
-    # Tried when the primary model stays overloaded after retries. Empty string disables it.
-    fallback_model: str = field(default_factory=lambda: os.getenv("VAANI_FALLBACK_MODEL", "gemini-3.1-flash-lite"))
+    # Comma-separated models tried in order when the primary is overloaded or out of quota.
+    fallback_models: tuple[str, ...] = field(
+        default_factory=lambda: tuple(
+            m.strip()
+            for m in os.getenv("VAANI_FALLBACK_MODELS", "gemini-3.5-flash,gemini-3.5-flash-lite").split(",")
+            if m.strip()
+        )
+    )
     embedding_model: str = field(default_factory=lambda: os.getenv("VAANI_EMBEDDING_MODEL", "gemini-embedding-001"))
     llm_max_retries: int = field(default_factory=lambda: int(os.getenv("VAANI_LLM_MAX_RETRIES", "3")))
     max_tool_rounds: int = field(default_factory=lambda: int(os.getenv("VAANI_MAX_TOOL_ROUNDS", "4")))
@@ -46,7 +52,7 @@ class Settings:
     rag_top_k: int = field(default_factory=lambda: int(os.getenv("VAANI_RAG_TOP_K", "3")))
     # Cosine similarity (0-1) a chunk must reach to be used as context. Gemini embeddings are
     # compressed (unrelated text still scores ~0.55), so the floor sits well above that.
-    rag_min_score: float = field(default_factory=lambda: float(os.getenv("VAANI_RAG_MIN_SCORE", "0.62")))
+    rag_min_score: float = field(default_factory=lambda: float(os.getenv("VAANI_RAG_MIN_SCORE", "0.68")))
     # Also drop chunks scoring more than this below the best match, to cut near-miss noise.
     rag_margin: float = field(default_factory=lambda: float(os.getenv("VAANI_RAG_MARGIN", "0.05")))
 
@@ -55,6 +61,8 @@ class Settings:
     state_dir: Path = field(default_factory=lambda: _path("VAANI_STATE_DIR", PROJECT_ROOT / ".state"))
 
     # --- Speech -----------------------------------------------------------
+    # "whisper" runs offline on this machine; "gemini" is far better at Kannada but uses API quota.
+    asr_backend: str = field(default_factory=lambda: os.getenv("VAANI_ASR_BACKEND", "whisper").lower())
     whisper_model: str = field(default_factory=lambda: os.getenv("VAANI_WHISPER_MODEL", "small"))
     whisper_device: str = field(default_factory=lambda: os.getenv("VAANI_WHISPER_DEVICE", "cpu"))
     whisper_compute_type: str = field(default_factory=lambda: os.getenv("VAANI_WHISPER_COMPUTE", "int8"))
