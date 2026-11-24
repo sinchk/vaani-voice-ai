@@ -1,0 +1,5 @@
+[
+  {"date": "2026-12-10", "time": "11:00 AM", "customer": "Sinchana", "status": "Booked"},
+  {"date": "2026-12-10", "time": "02:00 PM", "customer": "Rahul", "status": "Booked"},
+  {"date": "2026-12-11", "time": "10:00 AM", "customer": "Ananya", "status": "Booked"}
+]

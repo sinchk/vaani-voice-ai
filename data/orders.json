@@ -1,0 +1,6 @@
+[
+  {"order_id": "1042", "status": "Shipped", "customer": "Sinchana", "items": ["Wireless Headphones"], "eta": "2026-12-05"},
+  {"order_id": "1043", "status": "Processing", "customer": "Rahul", "items": ["Smartphone Case"], "eta": "2026-12-07"},
+  {"order_id": "1044", "status": "Delivered", "customer": "Ananya", "items": ["Running Shoes"], "eta": "2026-11-20"},
+  {"order_id": "1045", "status": "Processing", "customer": "Sinchana", "items": ["Bluetooth Speaker", "USB-C Cable"], "eta": "2026-12-09"}
+]
