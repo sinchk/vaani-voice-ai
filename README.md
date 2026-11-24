@@ -1,0 +1,114 @@
+# Vaani — Multilingual Agentic Voice AI
+
+Vaani is a customer-support assistant that you can **talk or type to in English, Kannada (ಕನ್ನಡ), or a mix of both**. It answers policy questions from a knowledge base (RAG), performs real actions through tools (order lookup/cancellation, appointment booking), remembers the conversation, and hands off to a human when it should.
+
+```
+ voice ─► Whisper (ASR) ─┐
+                         ▼
+ text ───────────────► Agent ──► Gemini (function calling) ──► tools: orders, appointments, handoff
+                         ▲  └─► reply ─► gTTS (TTS) ─► voice
+                         │
+              ChromaDB ◄─┘  multilingual embeddings (Kannada query → English policy)
+```
+
+## Highlights
+
+- **Real tool calling.** Gemini decides which tool to call and with what arguments (function calling), so "cancel it", "ನನ್ನ ಆರ್ಡರ್ ಎಲ್ಲಿದೆ?" or "book me in tomorrow at 10" all work without keyword rules. Each tool call and its result is returned to the UI.
+- **Grounded answers.** Policy questions are answered from retrieved knowledge-base chunks. Off-topic questions retrieve nothing, and the assistant is instructed to say so rather than invent an answer.
+- **Honest confidence.** The `confidence` field is the cosine similarity of the best retrieved chunk, or `null` when no knowledge was used. It is never a made-up default.
+- **Conversation memory.** Per-session history is sent to the model, so follow-ups ("1042" after "where is my order?") work. Memory is bounded.
+- **Human handoff, two ways.** The model can call `request_human_handoff`, and a deterministic English/Kannada keyword check guarantees an explicit request for a person is always honoured — even if the LLM is down. The handoff includes a summary (reason, slots, recent messages, tools used).
+- **Resilient.** Retries with backoff on 429/5xx, automatic fallback model, graceful degradation if retrieval fails, and clear HTTP errors (`503` busy, `502` failed) instead of fake replies.
+- **Voice that works over HTTP.** `/api/voice` takes audio, returns transcript + reply + a URL to the spoken reply; the TTS language follows the script of the reply.
+- **Demo data never dirties git.** Seed data in `data/` is copied to `.state/` on first use; mutations happen there.
+
+## Quick start
+
+Requires Python 3.10+ and a [Gemini API key](https://aistudio.google.com/apikey). `ffmpeg` is needed for non-WAV audio.
+
+```bash
+python -m venv venv && source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env                                   # then set GEMINI_API_KEY
+
+uvicorn vaani.api.app:app --reload                     # API  → http://localhost:8000/docs
+streamlit run frontend/app.py                          # UI   → http://localhost:8501
+```
+
+The knowledge base is embedded automatically on first start (or run `python -m vaani.rag.ingest --reset`). Whisper weights download on the first voice request.
+
+### Docker
+
+```bash
+cp .env.example .env   # set GEMINI_API_KEY
+docker compose up --build
+```
+
+API on `:8000`, UI on `:8501`; state, vector store and model weights persist in named volumes.
+
+## Try it
+
+| Say | What happens |
+|---|---|
+| "What is your return policy?" | RAG → answer citing the 30-day policy, with sources |
+| "Where is my order 1042?" | `get_order_status("1042")` |
+| "Cancel order 1043" | `cancel_order("1043")` (order 1042 is shipped, so it is refused with an explanation) |
+| "Book an appointment for Sinchana tomorrow at 10 AM" | model resolves the date → `book_appointment(...)` |
+| "ನನ್ನ ಆರ್ಡರ್ 1043 ಸ್ಥಿತಿ ಏನು?" | Kannada in, Kannada out, same tool |
+| "I want to talk to a human" | handoff + summary |
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/chat` | `{session_id, message}` → reply, `sources`, `tool_calls`, `confidence`, `handoff`, `handoff_summary` |
+| `POST /api/voice` | multipart `session_id` + `file` → everything above plus `transcript`, `detected_language`, `audio_url` |
+| `GET /api/audio/{name}` | the synthesized reply (mp3; auto-expires) |
+| `GET/POST /api/tools/...` | call the business tools directly |
+| `GET /api/health` | liveness, model, whether a key is configured |
+
+Interactive docs: `/docs`.
+
+## Project layout
+
+```
+vaani/
+  config.py            all settings (env-driven, paths anchored to the repo)
+  agent/               agent loop, Gemini wrapper (retry/fallback), memory, prompts, handoff
+  tools/               orders, appointments, JSON store, registry (schemas + implementations)
+  rag/                 embeddings, ingestion/chunking, retriever
+  speech/              faster-whisper ASR, gTTS TTS
+  api/                 FastAPI app, routes, schemas, dependencies
+  evaluation/          end-to-end benchmark
+frontend/app.py        Streamlit UI
+data/                  seed orders/appointments + knowledge-base documents
+tests/                 unit + API tests (no network needed)
+```
+
+To add a tool, write the function and add one `ToolSpec` in `vaani/tools/registry.py`; the schema Gemini sees and the code that runs it live together. To extend the knowledge base, drop a `.txt` file into `data/knowledge_base/` and run `python -m vaani.rag.ingest`.
+
+## Configuration
+
+Everything is optional except `GEMINI_API_KEY`; see [`.env.example`](.env.example). Notable knobs: `VAANI_CHAT_MODEL`, `VAANI_FALLBACK_MODEL`, `VAANI_WHISPER_MODEL` (use `small` or larger for Kannada), `VAANI_RAG_MIN_SCORE`.
+
+## Testing and evaluation
+
+```bash
+pip install -r requirements-dev.txt
+pytest          # 70+ tests, fully offline (LLM, retriever, ASR and TTS are faked)
+ruff check .
+```
+
+The benchmark runs 19 realistic cases (English + Kannada: RAG, tools, no-tool, handoff, multi-turn) against a live server and reports tool accuracy, RAG recall@3, answer-fact coverage, handoff accuracy and latency percentiles:
+
+```bash
+VAANI_STATE_DIR=.state-eval uvicorn vaani.api.app:app &   # separate state: the benchmark books appointments
+python -m vaani.evaluation.benchmark --report docs/evaluation.md
+```
+
+## Limitations
+
+- Sessions and memory live in process (restarting clears them); use Redis or a database for multi-instance deployments.
+- gTTS needs internet access; Kannada ASR quality depends on the Whisper model size.
+- Orders and appointments are JSON files, a stand-in for a real backend; the `OrderService` / `AppointmentService` interfaces are where a database or API would plug in.
+- Retrieval scores from Gemini embeddings are compressed (unrelated text still scores about 0.55), so `VAANI_RAG_MIN_SCORE` was tuned empirically (0.62) on this small knowledge base and should be re-tuned if you add many documents.
