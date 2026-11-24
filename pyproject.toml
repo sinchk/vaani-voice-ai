@@ -1,0 +1,18 @@
+[project]
+name = "vaani"
+version = "0.2.0"
+description = "Multilingual (English / Kannada) agentic voice AI with RAG and tool calling."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["venv", "proj_tmp"]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["B008"]  # FastAPI's Depends() in defaults is idiomatic

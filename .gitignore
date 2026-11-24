@@ -23,3 +23,12 @@ chroma_db/
 # Audio output dumps
 *.wav
 *.mp3
+
+# Runtime state (mutated demo data, generated audio)
+.state/
+.state-*/
+
+# Tooling
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
