@@ -55,7 +55,13 @@ CASES: list[Case] = [
         source="return_policy.txt",
         facts=["unused", "original packaging"],
     ),
-    Case("shipping time", ["How long does shipping take?"], "rag", source="shipping_policy.txt", facts=["5-7", "2-3"]),
+    Case(
+        "shipping time",
+        ["How long does shipping take?"],
+        "rag",
+        source="shipping_policy.txt",
+        facts=["5-7", "5 to 7", "2-3", "2 to 3"],
+    ),
     Case(
         "cancellation policy",
         ["Help me with the cancellation policy"],
@@ -215,6 +221,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark a running Vaani API.")
     parser.add_argument("--base-url", default="http://localhost:8000")
     parser.add_argument("--delay", type=float, default=1.0, help="seconds between cases (rate-limit friendly)")
+    parser.add_argument(
+        "--only", help="run only cases whose name contains any of these comma-separated terms (saves quota)"
+    )
     parser.add_argument("--report", type=Path, help="write a markdown report to this path")
     parser.add_argument("--json", type=Path, help="write raw results to this path")
     args = parser.parse_args()
@@ -226,7 +235,9 @@ def main() -> int:
             print(f"Cannot reach {args.base_url}: {exc}\nStart it with: uvicorn vaani.api.app:app", file=sys.stderr)
             return 2
         results = []
-        for case in CASES:
+        for case in [
+            c for c in CASES if not args.only or any(t.strip().lower() in c.name.lower() for t in args.only.split(","))
+        ]:
             try:
                 res = run_case(client, case)
             except httpx.HTTPError as exc:
