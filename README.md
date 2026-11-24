@@ -18,7 +18,8 @@ Vaani is a customer-support assistant that you can **talk or type to in English,
 - **Honest confidence.** The `confidence` field is the cosine similarity of the best retrieved chunk, or `null` when no knowledge was used. It is never a made-up default.
 - **Conversation memory.** Per-session history is sent to the model, so follow-ups ("1042" after "where is my order?") work. Memory is bounded.
 - **Human handoff, two ways.** The model can call `request_human_handoff`, and a deterministic English/Kannada keyword check guarantees an explicit request for a person is always honoured — even if the LLM is down. The handoff includes a summary (reason, slots, recent messages, tools used).
-- **Resilient.** Retries with backoff on 429/5xx, automatic fallback model, graceful degradation if retrieval fails, and clear HTTP errors (`503` busy, `502` failed) instead of fake replies.
+- **Resilient.** Retries with backoff on 429/5xx, automatic fallback-model chain, graceful degradation if retrieval fails, and clear HTTP errors (`503` busy, `502` failed) instead of fake replies.
+- **Two speech-recognition backends.** Whisper runs fully offline (good for English); `VAANI_ASR_BACKEND=gemini` uses Gemini's native audio understanding, which is what you want for Kannada (see [evaluation](docs/evaluation.md)).
 - **Voice that works over HTTP.** `/api/voice` takes audio, returns transcript + reply + a URL to the spoken reply; the TTS language follows the script of the reply.
 - **Demo data never dirties git.** Seed data in `data/` is copied to `.state/` on first use; mutations happen there.
 
@@ -89,13 +90,28 @@ To add a tool, write the function and add one `ToolSpec` in `vaani/tools/registr
 
 ## Configuration
 
-Everything is optional except `GEMINI_API_KEY`; see [`.env.example`](.env.example). Notable knobs: `VAANI_CHAT_MODEL`, `VAANI_FALLBACK_MODEL`, `VAANI_WHISPER_MODEL` (use `small` or larger for Kannada), `VAANI_RAG_MIN_SCORE`.
+Everything is optional except `GEMINI_API_KEY`; see [`.env.example`](.env.example). Notable knobs: `VAANI_CHAT_MODEL`, `VAANI_FALLBACK_MODELS`, `VAANI_WHISPER_MODEL` (use `small` or larger for Kannada), `VAANI_RAG_MIN_SCORE`.
+
+## Results
+
+Measured on a live run (details and per-case table in [docs/evaluation.md](docs/evaluation.md)):
+
+| Metric | Result |
+|---|---|
+| Tool accuracy (name + arguments) | 100% (7/7) |
+| RAG recall@3 | 100% (6/6, incl. Kannada) |
+| Answer-fact coverage (EN) | 100% (6/6) |
+| Handoff accuracy (incl. negatives) | 100% (3/3) |
+| No-tool accuracy | 100% (3/3) |
+| Latency p50 | ~3.9 s (a tool-calling turn makes two LLM calls) |
+
+The suite is small (19 cases), so read these as a regression check, not a benchmark of general quality.
 
 ## Testing and evaluation
 
 ```bash
 pip install -r requirements-dev.txt
-pytest          # 70+ tests, fully offline (LLM, retriever, ASR and TTS are faked)
+pytest          # 77 tests, fully offline (LLM, retriever, ASR and TTS are faked)
 ruff check .
 ```
 
@@ -108,7 +124,8 @@ python -m vaani.evaluation.benchmark --report docs/evaluation.md
 
 ## Limitations
 
+- The Gemini **free tier allows only ~20 generate requests per model per day**; the fallback chain stretches this, but for real use enable billing on your key.
 - Sessions and memory live in process (restarting clears them); use Redis or a database for multi-instance deployments.
-- gTTS needs internet access; Kannada ASR quality depends on the Whisper model size.
+- gTTS needs internet access. Whisper on CPU is poor at Kannada even at `medium` (and slow); use `VAANI_ASR_BACKEND=gemini` for Kannada voice.
 - Orders and appointments are JSON files, a stand-in for a real backend; the `OrderService` / `AppointmentService` interfaces are where a database or API would plug in.
-- Retrieval scores from Gemini embeddings are compressed (unrelated text still scores about 0.55), so `VAANI_RAG_MIN_SCORE` was tuned empirically (0.62) on this small knowledge base and should be re-tuned if you add many documents.
+- Retrieval scores from Gemini embeddings are compressed (unrelated text still scores about 0.55), so `VAANI_RAG_MIN_SCORE` was tuned empirically (0.68) on this small knowledge base and should be re-tuned if you add many documents.
